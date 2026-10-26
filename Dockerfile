@@ -10,11 +10,11 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
-    libpq-dev \
+    libsqlite3-dev \
     zip \
     unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_mysql pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip opcache \
+    && docker-php-ext-install pdo_mysql pdo_sqlite mbstring exif pcntl bcmath gd zip opcache \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Konfigurasi Apache Document Root ke folder public Laravel
@@ -39,9 +39,12 @@ COPY . .
 # Generate classmap autoloading production
 RUN composer dump-autoload --optimize --no-dev
 
-# Atur hak akses permission untuk folder storage dan cache
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
+# Buat folder untuk SQLite database
+RUN mkdir -p /var/www/html/database
+
+# Atur hak akses permission untuk folder storage, cache, dan database
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database \
     && chmod +x /var/www/html/docker-entrypoint.sh
 
 # Expose port (Render akan menggunakan PORT dinamis)
