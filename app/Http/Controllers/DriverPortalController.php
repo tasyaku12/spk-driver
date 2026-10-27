@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Hasil;
 use App\Models\Nilai;
+use App\Services\SawService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class DriverPortalController extends Controller
 {
-    public function dashboard(Request $request)
+    public function dashboard(Request $request, SawService $saw)
     {
         $user = $request->user() ?? auth()->user();
         if (!$user) {
@@ -27,11 +29,15 @@ class DriverPortalController extends Controller
         $periode = $request->query('periode', $periods->first() ?? now()->format('Y-m'));
 
         $hasilDriver = Hasil::where('driver_id', $driver->id)->where('periode', $periode)->first();
-        $nilais = Nilai::with('criteria')->where('driver_id', $driver->id)->where('periode', $periode)->get();
+        $nilais = Nilai::with('criteria')->where('driver_id', $driver->id)->where('periode', $periode)
+            ->get()
+            ->sortBy(fn ($n) => $n->criteria->kode ?? '');
         $totalEvaluasi = Hasil::where('periode', $periode)->count();
 
         $top3 = Hasil::with('driver')->where('periode', $periode)->orderBy('ranking')->take(3)->get();
         $riwayat = Hasil::where('driver_id', $driver->id)->orderBy('periode', 'desc')->get();
+        $rincian = $hasilDriver ? $saw->rincianDriver($driver->id, $periode) : null;
+        $tren = $riwayat->sortBy('periode')->values();
 
         return view('driver.dashboard', compact(
             'user',
@@ -42,7 +48,9 @@ class DriverPortalController extends Controller
             'nilais',
             'totalEvaluasi',
             'top3',
-            'riwayat'
+            'riwayat',
+            'rincian',
+            'tren'
         ));
     }
 
@@ -123,5 +131,37 @@ class DriverPortalController extends Controller
         $user->save();
 
         return back()->with('ok', 'Password akun Anda berhasil diperbarui.');
+    }
+
+    public function pdf(Request $request, SawService $saw)
+    {
+        $user = $request->user() ?? auth()->user();
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
+        $driver = $user->driver;
+        if (!$driver) {
+            return back()->with('warn', 'Akun Anda belum terhubung ke data driver.');
+        }
+
+        $periode = $request->query('periode', now()->format('Y-m'));
+        $hasilDriver = Hasil::where('driver_id', $driver->id)->where('periode', $periode)->first();
+        if (!$hasilDriver) {
+            return back()->with('warn', 'Belum ada hasil perhitungan untuk periode ini.');
+        }
+
+        $totalEvaluasi = Hasil::where('periode', $periode)->count();
+        $rincian = $saw->rincianDriver($driver->id, $periode);
+        $riwayat = Hasil::where('driver_id', $driver->id)->orderBy('periode', 'desc')->get();
+
+        return Pdf::loadView('driver.pdf', [
+            'driver'        => $driver,
+            'periode'       => $periode,
+            'hasilDriver'   => $hasilDriver,
+            'totalEvaluasi' => $totalEvaluasi,
+            'rincian'       => $rincian,
+            'riwayat'       => $riwayat,
+        ])->setPaper('a4')->download('kinerja-'.$driver->kode.'-'.$periode.'.pdf');
     }
 }

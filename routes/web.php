@@ -57,6 +57,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 Route::middleware(['auth', 'role:driver'])->prefix('driver')->name('driver.')->group(function () {
     Route::get('/dashboard', [DriverPortalController::class, 'dashboard'])->name('dashboard');
     Route::get('/leaderboard', [DriverPortalController::class, 'leaderboard'])->name('leaderboard');
+    Route::get('/laporan-pdf', [DriverPortalController::class, 'pdf'])->name('pdf');
     Route::get('/profile', [DriverPortalController::class, 'profile'])->name('profile');
     Route::post('/profile', [DriverPortalController::class, 'updateProfile'])->name('profile.update');
     Route::post('/password', [DriverPortalController::class, 'updatePassword'])->name('password.update');
